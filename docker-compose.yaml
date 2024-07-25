@@ -1,0 +1,139 @@
+version: '3'
+services:
+  traefik:
+    image: traefik:v3.1
+    command: 
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--entryPoints.dot.address=:853"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"
+     - "853:853"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  myspeed:
+    restart: unless-stopped
+    image: germannewsmaker/myspeed
+    ports:
+      - "5216:5216"
+    labels:
+      - traefik.http.routers.myspeed-wesleynepo.rule=Host(`speed.home`)
+      - traefik.http.services.myspeed-wesleynepo.loadbalancer.server.port=5216
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: adguard
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Paris
+    expose:
+      - "80"
+      - "53"
+      - "853"
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - /home/docker/vol/adguard/work:/opt/adguardhome/work
+      - /home/docker/config/adguard/conf:/opt/adguardhome/conf
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adguard.entrypoints=web"
+      - "traefik.http.routers.adguard.rule=Host(`dns.home`)" 
+        #      - "traefik.http.routers.adguard.middlewares=https-redirect@file"
+      - "traefik.http.routers.adguard-secure.entrypoints=websecure"
+      - "traefik.http.routers.adguard-secure.rule=Host(`dns.home`)" 
+      - "traefik.http.routers.adguard-secure.tls=true"
+      - "traefik.http.routers.adguard-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.adguard-secure.service=adguard-secure"
+      - "traefik.http.services.adguard-secure.loadbalancer.server.port=80" 
+      - "traefik.docker.network=traefik"
+      - "traefik.tcp.routers.adguard-tls.rule=HostSNI(`dns.home`)"
+      - "traefik.tcp.routers.adguard-tls.tls=true"
+      - "traefik.tcp.routers.adguard-tls.entrypoints=dot"
+      - "traefik.tcp.routers.adguard-tls.tls.certresolver=letsencrypt"
+      - "traefik.tcp.routers.adguard-tls.service=adguard-tls"
+      - "traefik.tcp.services.adguard-tls.loadbalancer.server.port=53"
+  deluge:
+    container_name: deluge
+    image: 'linuxserver/deluge:latest'
+    restart: unless-stopped
+    ports:
+      - "8112:8112"
+    environment:
+      - 'PUID=1000'
+      - 'PGID=1000'
+      - 'TZ=America/Sao_Paulo'
+    volumes:
+      - '/home/wesleynepo/MediaCenter/config/deluge:/config'
+      - '/home/wesleynepo/media:/MediaCenterBox'
+    labels:
+      - traefik.http.routers.deluge.rule=Host(`deluge.home`)
+      - traefik.http.services.deluge.loadbalancer.server.port=8112
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - 'TZ=America/Sao_Paulo'
+    ports:
+      - 9696:9696 
+    volumes:
+      - '/home/wesleynepo/MediaCenter/config/prowlarr:/config'
+    restart: unless-stopped
+    labels:
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.home`)
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+  sonarr:
+    container_name: sonarr
+    image: 'linuxserver/sonarr:latest'
+    restart: unless-stopped
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - 'TZ=America/Sao_Paulo'
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro'
+      - '/home/wesleynepo/MediaCenter/config/sonarr:/config'
+      - '/home/wesleynepo/media:/MediaCenterBox'
+    labels:
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.home`)
+      - traefik.http.services.sonarr.loadbalancer.server.port=8989
+  radarr:
+    container_name: radarr
+    image: 'linuxserver/radarr:latest'
+    restart: unless-stopped
+    ports:
+      - 7878:7878 
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - 'TZ=America/Sao_Paulo'
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro'
+      - '/home/wesleynepo/MediaCenter/config/radarr:/config'
+      - '/home/wesleynepo/media:/MediaCenterBox'
+    labels:
+      - traefik.http.routers.radarr.rule=Host(`radarr.home`)
+      - traefik.http.services.radarr.loadbalancer.server.port=7878
+  plex-server:
+    container_name: plex
+    image: 'plexinc/pms-docker:latest'
+    restart: unless-stopped
+    ports:
+      - 32400:32400 
+    environment:
+      - 'TZ=America/Sao_Paulo'
+    volumes:
+      - '/home/wesleynepo/MediaCenter/config/plex/db:/config'
+      - '/home/wesleynepo/MediaCenter/config/plex/transcode:/transcode'
+      - '/home/wesleynepo/media/Completed:/MediaCenterBox'
+    labels:
+      - traefik.http.routers.plex.rule=Host(`plex.home`)
+      - traefik.http.services.plex.loadbalancer.server.port=32400
