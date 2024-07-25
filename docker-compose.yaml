@@ -12,7 +12,7 @@ services:
     ports:
       - "80:80"
       - "8080:8080"
-     - "853:853"
+      - "853:853"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
   myspeed:
